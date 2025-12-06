@@ -1,0 +1,6 @@
+/server/node_modules/
+/front/node_modules/
+server/.env
+front/.env
+node_modules
+
