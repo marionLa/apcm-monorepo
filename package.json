@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install:all": "npm install && cd front && npm install && cd ../server && npm install",
+    "dev": "concurrently cd front && npm run dev cd server && npm run dev",
+    "build": "cd front && npm run build && cd ../server && npm run build"
   },
   "repository": {
     "type": "git",
@@ -18,4 +21,5 @@
     "dotenv": "^17.2.3",
     "nodemailer": "^7.0.11"
   }
+
 }
