@@ -4,12 +4,12 @@
     {
       "src": "server/index.js",
       "use": "@vercel/node",
-      "config": { "distDir": "server/dist" }
+      "outputDirectory": "server/dist"
     },
     {
       "src": "front/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "front/dist" }
+      "outputDirectory": "front/dist"
     }
   ],
   "routes": [
