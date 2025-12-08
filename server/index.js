@@ -79,7 +79,7 @@ const defaultData = {
     content: {
         logo: '',
         banner: '',
-        description: 'Bienvenue sur le site de notre association.',
+        description: '',
         whatsappLink: '',
         facebookLink: '',
         helloAssoLink: '',
