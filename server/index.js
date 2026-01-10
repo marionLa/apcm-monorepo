@@ -9,6 +9,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
@@ -24,11 +25,11 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false, // set to true if using https
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        secure: process.env.NODE_ENV === 'production', // true en prod (HTTPS)
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' requis pour cross-site cookies
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
-
 app.use(passport.initialize());
 app.use(passport.session());
 
