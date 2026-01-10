@@ -15,11 +15,10 @@
   },
   "private": true,
   "devDependencies": {
-    "vite": "^7.2.6"
+    "vite": "^7.2.7"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
     "nodemailer": "^7.0.11"
   }
-
 }

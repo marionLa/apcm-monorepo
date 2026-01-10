@@ -4,3 +4,5 @@ server/.env
 front/.env
 node_modules
 
+.vercel
+.env*.local
