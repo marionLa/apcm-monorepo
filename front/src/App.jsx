@@ -13,7 +13,10 @@ import AdminDashboard from './components/AdminDashboard';
 
 export const instance = axios.create({
     baseURL: import.meta.env.VITE_BACKEND_URL,
-    withCredentials: true
+    withCredentials: true,
+    headers: {
+        'Access-Control-Allow-Origin': import.meta.env.VITE_FRONTEND_URL,
+    },
 });
 
 
