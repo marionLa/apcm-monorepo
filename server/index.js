@@ -84,7 +84,6 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log('Connecté à MongoDB Atlas'))
     .catch(err => console.error('Erreur connexion MongoDB', err));
 
-const upload = multer({ storage: multer.memoryStorage() });
 
 app.get('/api/file/:fileName', async (req, res) => {
     const { fileName } = req.params;
@@ -144,11 +143,12 @@ app.post('/api/upload', async (req, res) => {
     const file = req.files.file;
     const fileName = Date.now() + '-' + file.name;
     const fileBuffer = file.data;
+    const bucket = process.env.SUPABASE_BUCKET;
 
     try {
         // Upload vers le bucket privé
         const { data, error } = await supabase.storage
-            .from('apcm-images') // Remplace par le nom de ton bucket
+            .from(bucket) // Remplace par le nom de ton bucket
             .upload(fileName, fileBuffer, {
                 contentType: file.mimetype,
                 upsert: false, // Empêche l'écrasement accidentel
