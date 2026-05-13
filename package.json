@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "install:all": "npm install && cd front && npm install && cd ../server && npm install",
-    "dev": "concurrently cd front && npm run dev cd server && npm run dev",
+    "dev": "cd front && npm run dev && cd server && npm run dev",
     "build": "cd front && npm run build && cd ../server && npm run build"
   },
   "repository": {
@@ -14,11 +14,10 @@
     "url": "https://github.com/marionLa/apcm-monorepo.git"
   },
   "private": true,
-  "devDependencies": {
-    "vite": "^7.2.7"
-  },
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "nodemailer": "^7.0.11"
+    "axios": "^1.16.0",
+    "connect-mongo": "^6.0.0",
+    "react-google-recaptcha-v3": "^1.11.0",
+    "react-router-dom": "^7.15.0"
   }
 }

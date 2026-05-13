@@ -1,32 +1,57 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 const session = require('express-session');
+const { MongoStore } = require('connect-mongo');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const mongoose = require('mongoose');
+const { createClient } = require('@supabase/supabase-js');
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+let supabase;
+try {
+    supabase = createClient(supabaseUrl, supabaseKey);
+} catch (e) {
+    console.error('Supabase init error:', e.message);
+}
+
+
+
+// --- Modèle Mongoose pour les métadonnées ---
+const contentSchema = new mongoose.Schema({
+    logo: String,
+    banner: String,
+    description: String,
+    whatsappLink: String,
+    facebookLink: String,
+    helloAssoLink: String,
+    contactEmail: String
+}, { collection: 'apcm-data' });
+
+const Content = mongoose.model('Content', contentSchema);
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
+const MONGO_URI = process.env.MONGO_URI; // Mets l'URI Atlas dans .env
 
 app.use(cors({
     origin: process.env.FRONTEND_URL,
     credentials: true
 }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Session configuration (must be before passport)
 app.use(session({
     secret: process.env.SESSION_SECRET || 'secret',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // true en prod (HTTPS)
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' requis pour cross-site cookies
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
@@ -55,69 +80,107 @@ passport.use(new GoogleStrategy({
     }
 ));
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('Connecté à MongoDB Atlas'))
+    .catch(err => console.error('Erreur connexion MongoDB', err));
 
-// Storage for uploaded files
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/')
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname)
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.get('/api/file/:fileName', async (req, res) => {
+    const { fileName } = req.params;
+
+    try {
+        const { data, error } = supabase.storage
+            .from('apcm-images')
+            .createSignedUrl(fileName, 60 * 60); // URL valide 1 heure
+
+        if (error) {
+            console.error('URL generation error:', error);
+            return res.status(500).json({ error: 'Failed to generate file URL' });
+        }
+
+        res.json({ url: data.signedUrl });
+    } catch (err) {
+        console.error('Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-const upload = multer({ storage: storage });
 
-// Mock Database (JSON file)
-const DB_FILE = 'db.json';
-const defaultData = {
-    content: {
-        logo: '',
-        banner: '',
-        description: '',
-        whatsappLink: '',
-        facebookLink: '',
-        helloAssoLink: '',
-        contactEmail: ''
+// --- Routes MongoDB ---
+app.get('/api/content', async (req, res) => {
+    try {
+        let content = await Content.findOne();
+        if (!content) {
+            // Si aucun document, on en crée un vide
+            content = await Content.create({});
+        }
+        res.json(content);
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de la récupération du contenu' });
     }
-};
-
-if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
-}
-
-function getDb() {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-}
-
-function saveDb(data) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
-
-// Routes
-app.get('/api/content', (req, res) => {
-    const db = getDb();
-    res.json(db.content);
 });
 
-app.post('/api/content', (req, res) => {
-    const db = getDb();
-    db.content = { ...db.content, ...req.body };
-    saveDb(db);
-    res.json(db.content);
+app.post('/api/content', async (req, res) => {
+    try {
+        let content = await Content.findOne();
+        if (!content) {
+            content = await Content.create(req.body);
+        } else {
+            Object.assign(content, req.body);
+            await content.save();
+        }
+        res.json(content);
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de la mise à jour du contenu' });
+    }
 });
 
-app.post('/api/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
+app.post('/api/upload', async (req, res) => {
+    if (!req.files || !req.files.file) {
         return res.status(400).send('No file uploaded.');
     }
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
+
+    const file = req.files.file;
+    const fileName = Date.now() + '-' + file.name;
+    const fileBuffer = file.data;
+
+    try {
+        // Upload vers le bucket privé
+        const { data, error } = await supabase.storage
+            .from('apcm-images') // Remplace par le nom de ton bucket
+            .upload(fileName, fileBuffer, {
+                contentType: file.mimetype,
+                upsert: false, // Empêche l'écrasement accidentel
+            });
+
+        if (error) {
+            console.error('Upload error:', error);
+            return res.status(500).json({ error: 'Failed to upload file' });
+        }
+
+        // Génère une URL signée (valide pour une durée limitée)
+        const { data: urlData, error: urlError } = supabase.storage
+            .from('ton_bucket_prive')
+            .createSignedUrl(fileName, 60 * 60 * 24 * 365); // URL valide 1 an
+
+        if (urlError) {
+            console.error('URL generation error:', urlError);
+            return res.status(500).json({ error: 'Failed to generate file URL' });
+        }
+
+        res.json({ url: urlData.signedUrl });
+    } catch (err) {
+        console.error('Upload error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+app.get('/api/ping', async (req, res) => {
+    await Content.findOne();
+    await supabase.storage.from('apcm-images').list('', { limit: 1 });
+    res.json({ ok: true });
 });
 
 // Auth Routes
@@ -138,7 +201,6 @@ app.get('/auth/google/callback',
     });
 
 app.get('/api/current_user', (req, res) => {
-    console.log('Current user session:', req.user);
     res.send(req.user);
 });
 
@@ -167,9 +229,9 @@ app.post('/api/contact', async (req, res) => {
         return res.status(500).json({ error: 'Captcha verification error' });
     }
 
-    // Get contact email from database
-    const db = getDb();
-    const contactEmail = db.content.contactEmail;
+    // Get contact email from MongoDB
+    let content = await Content.findOne();
+    const contactEmail = content ? content.contactEmail : null;
 
     if (!contactEmail) {
         return res.status(400).json({ error: 'No contact email configured' });
@@ -209,6 +271,10 @@ app.post('/api/contact', async (req, res) => {
 });
 
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
+
+module.exports = app;

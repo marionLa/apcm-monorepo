@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "crons": [
+    {
+      "path": "/api/ping",
+      "schedule": "0 8 * * 1,4"
+    }
+  ],
+  "builds": [
+    {
+      "src": "front/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    },
+    {
+      "src": "server/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/server/index.js" },
+    { "src": "/auth/(.*)", "dest": "/server/index.js" },
+    { "src": "/test", "dest": "/server/index.js" },
+    { "src": "/assets/(.*)", "dest": "/front/assets/$1" },
+    { "src": "/favicon.png", "dest": "/front/favicon.png" },
+    { "src": "/(.*)", "dest": "/front/index.html" }
+  ]
+}
