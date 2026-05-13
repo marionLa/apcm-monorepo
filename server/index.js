@@ -87,10 +87,11 @@ mongoose.connect(MONGO_URI)
 
 app.get('/api/file/:fileName', async (req, res) => {
     const { fileName } = req.params;
+    const bucket = process.env.SUPABASE_BUCKET
 
     try {
         const { data, error } = supabase.storage
-            .from('apcm-images')
+            .from(bucket)
             .createSignedUrl(fileName, 60 * 60); // URL valide 1 heure
 
         if (error) {
@@ -161,7 +162,7 @@ app.post('/api/upload', async (req, res) => {
 
         // Génère une URL signée (valide pour une durée limitée)
         const { data: urlData, error: urlError } = supabase.storage
-            .from('ton_bucket_prive')
+            .from(bucket)
             .createSignedUrl(fileName, 60 * 60 * 24 * 365); // URL valide 1 an
 
         if (urlError) {
@@ -179,7 +180,7 @@ app.post('/api/upload', async (req, res) => {
 
 app.get('/api/ping', async (req, res) => {
     await Content.findOne();
-    await supabase.storage.from('apcm-images').list('', { limit: 1 });
+    await supabase.storage.from(bucket).list('', { limit: 1 });
     res.json({ ok: true });
 });
 
